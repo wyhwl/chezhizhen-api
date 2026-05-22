@@ -1,0 +1,7 @@
+{
+  "name": "chezhizhen-api",
+  "version": "1.0",
+  "scripts": {
+    "dev": "node api/index.js"
+  }
+}
