@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>车智诊 · 管理后台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; padding: 16px; }
+    .wrap { max-width: 700px; margin: 0 auto; }
+    h1 { font-size: 1.3rem; color: #fff; }
+    .sub { font-size: 0.75rem; color: #888; margin-bottom: 16px; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 14px; overflow-x: auto; }
+    .tab { padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; background: #1a1d27; color: #888; white-space: nowrap; }
+    .tab.on { background: #2196f3; color: #fff; }
+    .tab-content { display: none; }
+    .tab-content.on { display: block; }
+    .box { background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+    .box h2 { font-size: 0.9rem; color: #aaa; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #2a2d3a; }
+    .btn { padding: 10px 20px; border: none; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #2196f3; color: #fff; width: 100%; }
+    .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
+    .btn-green { background: #4caf50; color: #fff; }
+    .btn-red { background: transparent; color: #f44336; border: 1px solid #f44336; }
+    select, input { background: #252836; border: 1px solid #333; border-radius: 8px; color: #e0e0e0; padding: 8px 10px; font-size: 0.85rem; width: 100%; margin-bottom: 8px; }
+    .code { font-family: monospace; font-size: 1rem; color: #4caf50; letter-spacing: 1px; user-select: all; cursor: pointer; }
+    .code-item { background: #252836; border-radius: 8px; padding: 8px 12px; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .code-item:hover { background: #2a2d3a; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .stat-card { background: #252836; border-radius: 10px; padding: 10px; text-align: center; }
+    .stat-num { font-size: 1.3rem; font-weight: 700; color: #fff; }
+    .stat-label { font-size: 0.65rem; color: #888; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1b5e20; color: #a5d6a7; padding: 10px 20px; border-radius: 10px; font-size: 0.8rem; display: none; z-index: 999; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔧 车智诊 · 管理后台</h1>
+  <div class="sub">永久免费 · Vercel 部署 · 数据存 GitHub</div>
+  <div class="tabs">
+    <div class="tab on" onclick="switchTab('gen')">📦 生成激活码</div>
+    <div class="tab" onclick="switchTab('codes')">🔑 所有码</div>
+    <div class="tab" onclick="switchTab('licenses')">📋 授权</div>
+    <div class="tab" onclick="switchTab('stats')">📊 统计</div>
+  </div>
+
+  <div class="tab-content on" id="tab-gen">
+    <div class="box">
+      <h2>生成激活码</h2>
+      <select id="codeType"><option value="month">月卡（30天）</option><option value="year">年卡（365天）</option><option value="lifetime">永久卡</option></select>
+      <input type="number" id="codeCount" value="1" min="1" max="50" placeholder="数量">
+      <button class="btn btn-primary" onclick="genCodes()">生成</button>
+      <div id="genResult" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-codes">
+    <div class="box">
+      <div style="display:flex;justify-content:space-between;"><h2 style="border:none;padding:0;margin:0;">所有激活码</h2><button class="btn btn-sm btn-green" onclick="loadCodes()">刷新</button></div>
+      <div id="allCodes"><div style="color:#666;">加载中...</div></div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-licenses">
+    <div class="box">
+      <div style="display:flex;justify-content:space-between;"><h2 style="border:none;padding:0;margin:0;">已激活设备</h2><button class="btn btn-sm btn-green" onclick="loadLicenses()">刷新</button></div>
+      <div id="licenseList"><div style="color:#666;">加载中...</div></div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-stats">
+    <div class="box">
+      <div style="display:flex;justify-content:space-between;"><h2 style="border:none;padding:0;margin:0;">数据统计</h2><button class="btn btn-sm btn-green" onclick="loadStats()">刷新</button></div>
+      <div class="stats" id="statsCards">
+        <div class="stat-card"><div class="stat-num">-</div><div class="stat-label">诊断次数</div></div>
+        <div class="stat-card"><div class="stat-num">-</div><div class="stat-label">车辆数</div></div>
+        <div class="stat-card"><div class="stat-num">-</div><div class="stat-label">准确率</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const API = 'https://chezhizhen-api.vercel.app';
+const MK = 'yuehua888';
+function $(id){return document.getElementById(id);}
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',3000);}
+function switchTab(n){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('on'));document.querySelector(`.tab[onclick*='${n}']`).classList.add('on');$('tab-'+n).classList.add('on');}
+async function genCodes(){
+  const type=$('codeType').value, cnt=parseInt($('codeCount').value)||1;
+  try{
+    const r=await fetch(API+'/api/admin/gen_code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({master_key:MK,type,count:cnt})});
+    const d=await r.json();
+    if(d.ok){
+      const tl={month:'月卡',year:'年卡',lifetime:'永久'};
+      let h='<div style="font-size:0.75rem;color:#888;margin-bottom:6px;">✅ 已生成，点击复制:</div>';
+      for(const c of d.codes) h+='<div class="code-item" onclick="copy(\''+c+'\')"><span class="code">'+c+'</span><span class="code-meta" style="color:#888;font-size:0.65rem;">'+tl[type]+'</span></div>';
+      $('genResult').innerHTML=h;
+      toast('生成'+d.count+'个');
+    } else toast(d.msg,1);
+  }catch(e){toast('失败',1);}
+}
+function copy(c){navigator.clipboard?.writeText(c);toast('已复制: '+c);}
+async function loadCodes(){
+  try{
+    const r=await fetch(API+'/api/admin/codes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({master_key:MK})});
+    const d=await r.json();
+    if(d.ok&&d.codes.length){
+      const tl={month:'月',year:'年',lifetime:'永久'};
+      let h='<table style="width:100%;font-size:0.75rem;"><tr><th>激活码</th><th>状态</th></tr>';
+      for(const c of d.codes){
+        const s=c.used?'<span style="color:#ffcc80;">已用</span>':'<span style="color:#4caf50;">可用</span>';
+        h+='<tr><td style="font-family:monospace;color:#4caf50;">'+c.code+'</td><td>'+tl[c.type]+' '+s+'</td></tr>';
+      }
+      h+='</table>';
+      $('allCodes').innerHTML=h;
+    } else $('allCodes').innerHTML='<div style="color:#888;">暂无</div>';
+  }catch(e){$('allCodes').innerHTML='<div style="color:#f44336;">加载失败</div>';}
+}
+async function loadLicenses(){
+  try{
+    const r=await fetch(API+'/api/admin/licenses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({master_key:MK})});
+    const d=await r.json();
+    if(d.ok&&d.licenses.length){
+      let h='<table style="width:100%;font-size:0.75rem;"><tr><th>激活码</th><th>类型</th><th>到期</th></tr>';
+      for(const l of d.licenses){
+        const e=new Date(l.expires_at), ed=e<new Date();
+        const tl=l.type==='month'?'月':l.type==='year'?'年':'永久';
+        h+='<tr><td style="font-family:monospace;font-size:0.65rem;">'+l.code+'</td><td>'+tl+'</td><td style="color:'+(ed?'#f44336':'#4caf50')+';">'+e.toLocaleDateString()+'</td></tr>';
+      }
+      h+='</table>';
+      $('licenseList').innerHTML=h;
+    } else $('licenseList').innerHTML='<div style="color:#888;">暂无激活记录</div>';
+  }catch(e){$('licenseList').innerHTML='<div style="color:#f44336;">加载失败</div>';}
+}
+async function loadStats(){
+  try{
+    const r=await fetch(API+'/api/admin/summary'); const d=await r.json();
+    if(d.ok){
+      $('statsCards').children[0].querySelector('.stat-num').textContent=d.total_scans;
+      $('statsCards').children[1].querySelector('.stat-num').textContent=d.total_vehicles;
+      const fb=await(await fetch(API+'/api/feedback/stats')).json();
+      $('statsCards').children[2].querySelector('.stat-num').textContent=fb.ok?fb.accuracy_rate+'%':'-';
+    }
+  }catch(e){}
+}
+</script>
+</body>
+</html>
