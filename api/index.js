@@ -1,12 +1,15 @@
 // 车智诊 API - Vercel Serverless 版本
 // 数据存储在 GitHub Issues 中（免费）
+// 环境变量需在 Vercel 项目设置中配置：
+//   GITHUB_TOKEN - GitHub Personal Access Token
+//   GITHUB_USER - GitHub 用户名
+//   GITHUB_REPO - 数据仓库名（默认 chezhizhen-data）
+//   MASTER_KEY - 管理员密钥
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 const GITHUB_USER = process.env.GITHUB_USER || '';
 const GITHUB_REPO = process.env.GITHUB_REPO || 'chezhizhen-data';
-const MASTER_KEY = 'yuehua888';
-
-// ========== 辅助函数 ==========
+const MASTER_KEY = process.env.MASTER_KEY || 'yuehua888';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,8 +28,6 @@ function error(msg, status = 400) {
   return json({ ok: false, msg }, status);
 }
 
-// ========== GitHub API 封装（用 Issues 当数据库）==========
-
 const DATA_LABELS = ['chezhizhen-data'];
 
 async function getIssueByTitle(title) {
@@ -42,7 +43,6 @@ async function getIssueByTitle(title) {
 async function getData(title) {
   const issue = await getIssueByTitle(title);
   if (!issue) return null;
-  // 解析 Issue body 里的 JSON
   try {
     return JSON.parse(issue.body);
   } catch {
@@ -54,7 +54,6 @@ async function setData(title, data) {
   const existing = await getIssueByTitle(title);
   const body = JSON.stringify(data, null, 2);
   if (existing) {
-    // 更新
     const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/issues/${existing.number}`;
     await fetch(url, {
       method: 'PATCH',
@@ -62,7 +61,6 @@ async function setData(title, data) {
       body: JSON.stringify({ body }),
     });
   } else {
-    // 创建
     const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/issues`;
     await fetch(url, {
       method: 'POST',
@@ -84,7 +82,6 @@ async function appendToList(key, item) {
 
 // ========== 激活码 API ==========
 
-// POST /api/admin/gen_code - 生成激活码
 async function handleGenCode(body) {
   if (body.master_key !== MASTER_KEY) return error('授权失败', 403);
   const type = body.type || 'month';
@@ -101,14 +98,12 @@ async function handleGenCode(body) {
   return json({ ok: true, codes: newCodes, count: newCodes.length });
 }
 
-// POST /api/admin/codes - 查看所有激活码
 async function handleListCodes(body) {
   if (body.master_key !== MASTER_KEY) return error('授权失败', 403);
   const codes = await getData('activation_codes') || [];
   return json({ ok: true, codes: codes.reverse() });
 }
 
-// POST /api/admin/delete_code - 删除激活码
 async function handleDeleteCode(body) {
   if (body.master_key !== MASTER_KEY) return error('授权失败', 403);
   let codes = await getData('activation_codes') || [];
@@ -117,7 +112,6 @@ async function handleDeleteCode(body) {
   return json({ ok: true });
 }
 
-// POST /api/admin/licenses - 查看已激活设备
 async function handleListLicenses(body) {
   if (body.master_key !== MASTER_KEY) return error('授权失败', 403);
   const licenses = await getData('licenses') || {};
@@ -127,7 +121,6 @@ async function handleListLicenses(body) {
   return json({ ok: true, licenses: result.sort((a, b) => new Date(b.activated_at) - new Date(a.activated_at)) });
 }
 
-// POST /api/activate - 用户激活
 async function handleActivate(body) {
   const code = (body.code || '').trim().toUpperCase();
   const deviceId = body.device_id || '';
@@ -157,7 +150,6 @@ async function handleActivate(body) {
   return json({ ok: true, msg: '激活成功！', license_key: licenseKey, type: codes[idx].type, expires_at: expiresAt });
 }
 
-// POST /api/verify - 验证许可
 async function handleVerify(body) {
   const deviceId = (body.device_id || '').trim();
   const licenses = await getData('licenses') || {};
@@ -172,7 +164,6 @@ async function handleVerify(body) {
   return json({ ok: true, valid: false });
 }
 
-// POST /api/auto_gen_code - 付费自动发码
 async function handleAutoGenCode(body) {
   if (body.secret !== 'chezhizhen_pay_2026') return error('签名错误', 403);
   const type = body.type || 'month';
@@ -187,7 +178,6 @@ async function handleAutoGenCode(body) {
 
 // ========== 诊断 API ==========
 
-// POST /api/scan/upload - 上传诊断结果
 async function handleUploadScan(body) {
   const scanId = Math.random().toString(36).slice(2, 10);
   body.scan_id = scanId;
@@ -198,19 +188,15 @@ async function handleUploadScan(body) {
   return json({ ok: true, scan_id: scanId });
 }
 
-// GET /api/vehicle/:vin - 某台车记录
 async function handleGetVehicle(vin) {
   const records = await getData(`vehicle_${vin}`) || [];
   return json({ ok: true, records: records.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) });
 }
 
-// GET /api/vehicles - 所有车辆列表
 async function handleListVehicles() {
-  // 只能通过查找所有 data_ 前缀的 issue 来实现
-  return json({ ok: true, vehicles: [] }); // 简化版本
+  return json({ ok: true, vehicles: [] });
 }
 
-// POST /api/feedback - 提交反馈
 async function handleFeedback(body) {
   const fb = {
     scan_id: body.scan_id, vin: body.vin || '',
@@ -224,7 +210,6 @@ async function handleFeedback(body) {
   return json({ ok: true });
 }
 
-// GET /api/feedback/stats - 准确率统计
 async function handleFeedbackStats() {
   const feedbacks = await getData('feedbacks') || [];
   const total = feedbacks.length;
@@ -233,7 +218,6 @@ async function handleFeedbackStats() {
   return json({ ok: true, total, accurate, inaccurate: total - accurate, accuracy_rate: rate });
 }
 
-// GET /api/pricing - 价格查询
 async function handlePricing() {
   return json({ ok: true, pricing: {
     month: { name: '月卡', days: 30, price: '联系管理员开通' },
@@ -242,10 +226,9 @@ async function handlePricing() {
   }});
 }
 
-// ========== 路由 ==========
+// ========== Vercel Serverless Handler ==========
 
 export default async function handler(req, res) {
-  // 处理 OPTIONS（CORS 预检）
   if (req.method === 'OPTIONS') {
     res.writeHead(204, corsHeaders);
     res.end();
@@ -261,14 +244,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 检查必要的环境变量
     if (!GITHUB_TOKEN || !GITHUB_USER) {
-      res.writeHead(200, { ...corsHeaders, 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: false, msg: '后端配置错误：请设置 GITHUB_TOKEN 和 GITHUB_USER 环境变量' }));
+      res.writeHead(500, { ...corsHeaders, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, msg: '后端配置错误：请在 Vercel 环境变量中设置 GITHUB_TOKEN 和 GITHUB_USER' }));
       return;
     }
 
-    // 路由匹配
     let result;
     if (method === 'POST' && path === '/api/admin/gen_code') result = await handleGenCode(body);
     else if (method === 'POST' && path === '/api/admin/codes') result = await handleListCodes(body);
@@ -288,7 +269,6 @@ export default async function handler(req, res) {
     else if (method === 'GET' && path === '/api/pricing') result = await handlePricing();
     else result = json({ ok: false, msg: '未知接口' }, 404);
 
-    // 返回结果
     const data = await result.json();
     res.writeHead(result.status, { ...corsHeaders, 'Content-Type': 'application/json' });
     res.end(JSON.stringify(data));
