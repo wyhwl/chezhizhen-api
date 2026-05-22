@@ -1,19 +1,18 @@
-// 车智诊 API - Vercel Serverless 版本（Express 方式）
-// 数据存储在 GitHub Issues 中（免费）
-// 环境变量需在 Vercel 项目设置中配置：
-//   GITHUB_TOKEN - GitHub Personal Access Token
-//   GITHUB_USER - GitHub 用户名
-//   GITHUB_REPO - 数据仓库名（默认 chezhizhen-data）
-//   MASTER_KEY - 管理员密钥
-
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const app = express();
 app.use(express.json());
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
+// 提供 admin.html 和静态文件
+const adminHtml = fs.readFileSync(path.join(__dirname, '..', 'admin.html'), 'utf-8');
+app.get('/admin', (req, res) => res.type('html').send(adminHtml));
+app.get('/admin.html', (req, res) => res.type('html').send(adminHtml));
+
+const GITHUB_TOKEN = proces…OKEN || '';
 const GITHUB_USER = process.env.GITHUB_USER || '';
 const GITHUB_REPO = process.env.GITHUB_REPO || 'chezhizhen-data';
-const MASTER_KEY = process.env.MASTER_KEY || 'yuehua888';
+const MASTER_KEY = proces…_KEY || 'yuehua888';
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -61,7 +60,8 @@ async function appendToList(key, item) {
   await setData(key, list);
 }
 
-// ========== 激活码 API ==========
+// ========== API ==========
+
 app.post('/api/admin/gen_code', async (req, res) => {
   if (req.body.master_key !== MASTER_KEY) return res.status(403).json({ ok: false, msg: '授权失败' });
   const type = req.body.type || 'month';
@@ -191,7 +191,6 @@ app.get('/', (req, res) => {
   res.json({ ok: true, msg: '车智诊 API v1.0 - Vercel' });
 });
 
-// 健康检查
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, status: 'running', has_token: !!GITHUB_TOKEN, user: GITHUB_USER });
 });
